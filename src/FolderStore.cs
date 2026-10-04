@@ -8,12 +8,20 @@ internal sealed class FolderEntry
     public string Path { get; set; } = "";
     public bool Pinned { get; set; }
     public int PinOrder { get; set; }
+    /// <summary>Total visits since the beginning.</summary>
     public int Count { get; set; }
     public DateTime LastUsed { get; set; }
+    /// <summary>Time (UTC) of the last visits, newest last. Used for "Most used" in the last N days.</summary>
+    public List<DateTime> Visits { get; set; } = new();
 
     [JsonIgnore] public string Name => FolderStore.DisplayName(Path);
 
-    public FolderEntry Clone() => (FolderEntry)MemberwiseClone();
+    public FolderEntry Clone()
+    {
+        var copy = (FolderEntry)MemberwiseClone();
+        copy.Visits = new List<DateTime>(Visits);
+        return copy;
+    }
 }
 
 internal sealed class StoreData
@@ -75,8 +83,18 @@ internal sealed class FolderStore
             }
             data.Folders ??= new();
             data.Folders.RemoveAll(f => string.IsNullOrWhiteSpace(f.Path));
+            foreach (var f in data.Folders)
+            {
+                f.Visits ??= new();
+                // Data from version 1.0.0 has no visit times: use the last-used time for the old visits.
+                if (f.Visits.Count == 0 && f.Count > 0 && f.LastUsed != default)
+                    f.Visits.AddRange(Enumerable.Repeat(f.LastUsed, Math.Min(f.Count, MaxVisitsPerFolder)));
+            }
         }
     }
+
+    /// <summary>Visit times kept per folder (keeps the data file small).</summary>
+    private const int MaxVisitsPerFolder = 100;
 
     public void RecordVisit(string path, int maxHistory)
     {
@@ -86,6 +104,9 @@ internal sealed class FolderStore
             var entry = FindOrAdd(path);
             entry.Count++;
             entry.LastUsed = DateTime.UtcNow;
+            entry.Visits.Add(entry.LastUsed);
+            if (entry.Visits.Count > MaxVisitsPerFolder)
+                entry.Visits.RemoveRange(0, entry.Visits.Count - MaxVisitsPerFolder);
             var extra = data.Folders.Where(f => !f.Pinned).OrderByDescending(f => f.LastUsed).Skip(maxHistory).ToList();
             foreach (var f in extra) data.Folders.Remove(f);
             SaveLocked();
@@ -158,8 +179,10 @@ internal sealed class FolderStore
             {
                 "pinned" => all.Where(f => f.Pinned).OrderBy(f => f.PinOrder),
                 "frequent" => all
-                    .Where(f => (t.ShowDuplicates || !f.Pinned) && f.Count >= t.MinUsesForFrequent && !isExcluded(f.Path))
-                    .OrderByDescending(f => f.Count).ThenByDescending(f => f.LastUsed),
+                    .Select(f => (Entry: f, Uses: UsesInWindow(f, t.FrequentDays)))
+                    .Where(x => (t.ShowDuplicates || !x.Entry.Pinned) && x.Uses >= t.MinUsesForFrequent && !isExcluded(x.Entry.Path))
+                    .OrderByDescending(x => x.Uses).ThenByDescending(x => x.Entry.LastUsed)
+                    .Select(x => x.Entry),
                 "recent" => all
                     .Where(f => (t.ShowDuplicates || !f.Pinned) && f.LastUsed != default && !isExcluded(f.Path))
                     .OrderByDescending(f => f.LastUsed),
@@ -174,6 +197,14 @@ internal sealed class FolderStore
             result.Add(new Section(key, Title(key), list));
         }
         return result;
+    }
+
+    /// <summary>Visits in the last <paramref name="days"/> days. 0 days = all visits since the beginning.</summary>
+    private static int UsesInWindow(FolderEntry f, int days)
+    {
+        if (days <= 0) return f.Count;
+        var since = DateTime.UtcNow.AddDays(-days);
+        return f.Visits.Count(v => v >= since);
     }
 
     private static string Title(string key) => key switch

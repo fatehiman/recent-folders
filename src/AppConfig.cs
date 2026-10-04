@@ -91,6 +91,7 @@ internal sealed class AppConfig
         Tracking.MaxRecent = Math.Clamp(Tracking.MaxRecent, 0, 200);
         Tracking.MaxFrequent = Math.Clamp(Tracking.MaxFrequent, 0, 200);
         Tracking.MinUsesForFrequent = Math.Max(1, Tracking.MinUsesForFrequent);
+        Tracking.FrequentDays = Math.Clamp(Tracking.FrequentDays, 0, 3650);
         Tracking.MaxHistory = Math.Clamp(Tracking.MaxHistory, 10, 5000);
         Tracking.ExcludePaths ??= new();
     }
@@ -152,6 +153,7 @@ internal sealed class TrackingSettings
     public int MaxRecent { get; set; } = 12;
     public int MaxFrequent { get; set; } = 8;
     public int MinUsesForFrequent { get; set; } = 2;
+    public int FrequentDays { get; set; } = 30;
     public bool ShowDuplicates { get; set; }
     public int MaxHistory { get; set; } = 300;
     public List<string> ExcludePaths { get; set; } = new();

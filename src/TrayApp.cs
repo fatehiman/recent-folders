@@ -282,7 +282,7 @@ internal sealed class TrayApp : ApplicationContext
     private void MenuClosed()
     {
         popup.Busy = false;
-        popup.TouchInside();
+        popup.ResumeAfterMenu();
     }
 
     private void OnStoreChanged()
@@ -336,7 +336,7 @@ internal sealed class TrayApp : ApplicationContext
         finally
         {
             popup.Busy = false;
-            popup.TouchInside();
+            popup.ResumeAfterMenu();
         }
     }
 

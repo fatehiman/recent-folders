@@ -46,9 +46,20 @@ Only one copy runs at a time. If you start the exe again, the window of the runn
 
 | Action | Result |
 |---|---|
-| Mouse on the icon | The window opens (fades in). It closes when the mouse leaves. |
-| Left click | The window opens and stays open until you click somewhere else. |
+| Mouse on the icon | The window opens (fades in). |
+| Left click | The window opens. |
 | Right click | Menu (see below). |
+
+**When the window closes**
+
+- When the mouse was inside the window and then leaves it (even by 1 pixel), the window
+  closes at once. Only the fade out runs; with `fadeOutMs: 0` it disappears immediately.
+  This is the same for mouse over, left click and the **Open** menu item.
+- Opened by mouse over, but the mouse never goes into the window: it closes `hideDelayMs`
+  after the mouse leaves the icon.
+- Opened by click or **Open**, and the mouse never goes into the window: it stays open
+  until you click somewhere else or press `Esc`.
+- While a menu or a dialog of the window is open, the window stays open.
 
 **Tray menu**
 
@@ -96,7 +107,7 @@ The full file with all options is [src/default.conf](src/default.conf). A short 
 | `window.showSectionTitles` | `true` | Show PINNED / MOST USED / RECENT. |
 | `fade.enabled`, `fadeInMs`, `fadeOutMs` | `true`, `150`, `200` | Fade effect. |
 | `mouseOver.openOnMouseOver` | `true` | Start value of the tray menu item. |
-| `mouseOver.showDelayMs`, `hideDelayMs` | `250`, `400` | Wait times before open / close. |
+| `mouseOver.showDelayMs`, `hideDelayMs` | `250`, `400` | Wait before open; wait before close if the mouse never entered the window. |
 | `font.family`, `font.size`, `font.titleSize` | `Segoe UI`, `9`, `7.5` | Font (sizes in points). |
 | `badge.style` | `pill` | `pill`, `rounded`, `square`, `outline`, `raised`, `compact`, or your own style. |
 | `badge.textColor`, `badge.bold` | `#000000`, `true` | Badge text. |
@@ -108,7 +119,7 @@ The full file with all options is [src/default.conf](src/default.conf). A short 
 | `tracking.pollIntervalSeconds` | `5` | How often Explorer is checked. |
 | `tracking.dwellSeconds` | `30` | How long a folder must stay open to count. |
 | `tracking.maxRecent`, `maxFrequent` | `12`, `8` | Number of badges per section. |
-| `tracking.minUsesForFrequent` | `2` | Uses needed for "Most used". |
+| `tracking.minUsesForFrequent`, `frequentDays` | `2`, `30` | "Most used" = used at least 2 times in the last 30 days, sorted by uses in that time. `frequentDays: 0` = no time limit. |
 | `tracking.showDuplicates` | `false` | `false` = each folder is shown only once. |
 | `tracking.maxHistory` | `300` | Not-pinned folders to remember. |
 | `tracking.excludePaths` | `[]` | Folders never tracked, with `*` and `?` wildcards. |

@@ -6,10 +6,11 @@ internal sealed class PopupForm : Form
     public readonly BadgePanel Panel = new() { Dock = DockStyle.Fill };
 
     private readonly System.Windows.Forms.Timer anim = new() { Interval = 15 };
-    private readonly System.Windows.Forms.Timer track = new() { Interval = 80 };
+    private readonly System.Windows.Forms.Timer track = new() { Interval = 30 };
     private AppConfig cfg = new();
     private Rectangle desired, iconRect;
     private bool byMouseOver;
+    private bool entered; // the mouse was inside the window since it opened
     private int fadeDir; // 1 = fading in, -1 = fading out, 0 = idle
     private double fadeFrom;
     private DateTime fadeStart, lastInside;
@@ -36,6 +37,8 @@ internal sealed class PopupForm : Form
         Controls.Add(Panel);
         anim.Tick += (_, _) => StepFade();
         track.Tick += (_, _) => TrackMouse();
+        // React at the moment the mouse leaves, not only on the next timer tick.
+        Panel.MouseLeave += (_, _) => TrackMouse();
     }
 
     protected override bool ShowWithoutActivation => true;
@@ -102,6 +105,7 @@ internal sealed class PopupForm : Form
 
         if (!Visible)
         {
+            entered = false;
             Panel.ResetScroll();
             Opacity = cfg.Fade.Enabled ? 0 : TargetOpacity;
             Bounds = bounds;
@@ -137,8 +141,15 @@ internal sealed class PopupForm : Form
         if (Visible) Hide();
     }
 
-    /// <summary>Reset the "mouse left" timer, for example after a menu closes.</summary>
-    public void TouchInside() => lastInside = DateTime.UtcNow;
+    /// <summary>
+    /// Call after a menu or dialog closes. The mouse may now be outside the window,
+    /// so we wait again until it enters (or until hideDelayMs passes in mouse-over mode).
+    /// </summary>
+    public void ResumeAfterMenu()
+    {
+        lastInside = DateTime.UtcNow;
+        entered = false;
+    }
 
     private void StartFade(int dir)
     {
@@ -176,20 +187,42 @@ internal sealed class PopupForm : Form
             track.Stop();
             return;
         }
+        var now = DateTime.UtcNow;
         if (Busy)
         {
-            TouchInside();
+            lastInside = now;
             return;
         }
+
+        var cursor = Cursor.Position;
+        if (Bounds.Contains(cursor))
+        {
+            entered = true;
+            lastInside = now;
+            if (fadeDir < 0) StartFade(1);
+            return;
+        }
+
+        // The mouse was in the window and now it is out: close at once (no hideDelayMs).
+        // This is for both ways of opening (mouse over and click / menu).
+        if (entered)
+        {
+            HideAnimated();
+            return;
+        }
+
+        // The mouse did not enter the window yet.
+        // Opened by click / menu: stay open (it closes when it loses focus).
         if (!byMouseOver) return;
 
+        // Opened by mouse over: the mouse may still be on the icon or on its way to the window.
         // The "hot zone" is the window plus the tray icon (and the space between them).
         var zone = iconRect.IsEmpty ? Bounds : Rectangle.Union(Bounds, iconRect);
         int margin = (int)(6 * DeviceDpi / 96f);
         zone.Inflate(margin, margin);
-        if (zone.Contains(Cursor.Position))
+        if (zone.Contains(cursor))
         {
-            TouchInside();
+            lastInside = now;
             if (fadeDir < 0) StartFade(1);
         }
         else if ((DateTime.UtcNow - lastInside).TotalMilliseconds >= cfg.MouseOver.HideDelayMs)
